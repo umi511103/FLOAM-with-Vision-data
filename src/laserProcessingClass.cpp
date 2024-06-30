@@ -42,43 +42,62 @@ void processImageRegions_surface(const cv::Mat& depthImage, cv::Mat gray, int st
             uchar minPixel = 255;
             uchar maxPixel = 0;
 
-            // Find the minimum and maximum non-zero pixel values in the window along X axis.
-            for (int wy = -half_window_size * 2; wy <= half_window_size * 2; ++wy) {
-                for (int wx = -half_window_size; wx <= half_window_size; ++wx) {
-                    uchar currentPixel = depthImage.at<uchar>(y + wy, x + wx);
-                    if (currentPixel != 0) {
-                        minPixel = std::min(minPixel, currentPixel);
-                        maxPixel = std::max(maxPixel, currentPixel);
+           // 先找x軸是否深度相同 再判斷y值的點是否梯度大致相同
+            for (int wx = -half_window_size; wx <= half_window_size; ++wx) {
+                uchar currentPixel = depthImage.at<uchar>(y, x + wx);
+                if (currentPixel != 0) {
+                    minPixel = std::min(minPixel, currentPixel);
+                    maxPixel = std::max(maxPixel, currentPixel);
+                }
+            }
+            if (maxPixel - minPixel <= depth_threshold) {
+                uchar currentPixel_top = depthImage.at<uchar>(y + half_window_size, x);
+                uchar currentPixel = depthImage.at<uchar>(y, x);
+                uchar currentPixel_down = depthImage.at<uchar>(y - half_window_size, x);
+
+                double gradient_1 = std::abs(currentPixel_top - currentPixel);
+                double gradient_2 = std::abs(currentPixel_down - currentPixel);
+
+                if (currentPixel != 0) {
+                    double gradient = std::abs(gradient_1 - gradient_2);
+
+                    if (gradient <= gradient_threshold) {
+                        planePixels.push_back(cv::Point(x, y));
+                        continue;
                     }
                 }
             }
 
-            if (maxPixel - minPixel <= depth_threshold) {
-                if (depthImage.at<uchar>(y, x) != 0) {
-                    planePixels.push_back(cv::Point(x, y));
-                    continue;
-                }
-            }
-
-            // Check along Y axis
+            // Reset min and max values
             minPixel = 255;
             maxPixel = 0;
+
+            // Check along Y 軸是否深度相同，再判斷x值的點是否梯度大致相同
             for (int wy = -half_window_size; wy <= half_window_size; ++wy) {
-                for (int wx = -half_window_size * 2; wx <= half_window_size * 2; ++wx) {
-                    uchar currentPixel = depthImage.at<uchar>(y + wy, x + wx);
-                    if (currentPixel != 0) {
-                        minPixel = std::min(minPixel, currentPixel);
-                        maxPixel = std::max(maxPixel, currentPixel);
+                uchar currentPixel = depthImage.at<uchar>(y + wy, x);
+                if (currentPixel != 0) {
+                    minPixel = std::min(minPixel, currentPixel);
+                    maxPixel = std::max(maxPixel, currentPixel);
+                }
+            }
+            if (maxPixel - minPixel <= depth_threshold) {
+                uchar currentPixel_left = depthImage.at<uchar>(y, x + half_window_size);
+                uchar currentPixel = depthImage.at<uchar>(y, x);
+                uchar currentPixel_right = depthImage.at<uchar>(y, x - half_window_size);
+
+                double gradient_1 = std::abs(currentPixel_left - currentPixel);
+                double gradient_2 = std::abs(currentPixel_right - currentPixel);
+
+                if (currentPixel != 0) {
+                    double gradient = std::abs(gradient_1 - gradient_2);
+
+                    if (gradient <= gradient_threshold) {
+                        planePixels.push_back(cv::Point(x, y));
+                        continue;
                     }
                 }
             }
-
-            if (maxPixel - minPixel <= depth_threshold) {
-                if (depthImage.at<uchar>(y, x) != 0) {
-                    planePixels.push_back(cv::Point(x, y));
-                    continue;
-                }
-            }
+                
             else {
                 // Check intensity along X axis
                 bool is_same_intensity = true;
@@ -296,12 +315,13 @@ void LaserProcessingClass::pointcloudtodepth(pcl::PointCloud<pcl::PointXYZI>::Pt
 
 
     //***********************先看深度值 再看強度值***********************
-    int window_size = 3;
+    int window_size = 5;
     int intensity_threshold = 10; // 假設閾值為10
     int half_window_size = window_size / 2;
     double depth_threshold = 1;
+    double gradient_threshold = 1.5;
 
-    processImage_surface(depthImage, gray, half_window_size, depth_threshold, intensity_threshold, window_size, planePixels);
+processImage_surface(depthImage,gray, half_window_size, depth_threshold, gradient_threshold, intensity_threshold, window_size, planePixels);
 
 
     // int startY = depthImage.rows * 1 / 3;
@@ -383,7 +403,7 @@ void LaserProcessingClass::pointcloudtodepth(pcl::PointCloud<pcl::PointXYZI>::Pt
             // }
         }
     }
-    double map_resolution = 0.1;
+    double map_resolution = 0.15;
     downSizeFilterSurf.setLeafSize(map_resolution * 2, map_resolution * 2, map_resolution * 2);
     downSamplingToMap(pc_out_surf, pc_out_surf);
     std::cout << "after plane number = " << pc_out_surf->points.size() << std::endl;
@@ -705,7 +725,7 @@ void LaserProcessingClass::featureExtractionFromSector(const pcl::PointCloud<pcl
                 point_info_count++;
             }
             //若超過20個之後的點曲率還是大於0.1也是push進edge點  //0529
-            else if (cloudCurvature[i].value > 0.06 && std::abs(pc_in->points[ind].y) >= 0.1) {
+            else if (cloudCurvature[i].value > 0.1 && std::abs(pc_in->points[ind].y) >= 0.1) {
                 pc_out_edge->push_back(pc_in->points[ind]);
                 picked_points.push_back(ind);
             }
