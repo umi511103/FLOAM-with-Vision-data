@@ -36,9 +36,10 @@ void LaserProcessingClass::downSamplingToMap(const pcl::PointCloud<pcl::PointXYZ
 
 //surface===============================
 
-void processImageRegions_surface(const cv::Mat& depthImage, cv::Mat gray, int startY, int endY, int half_window_size, int depth_threshold, int intensity_threshold, int window_size, std::vector<cv::Point>& planePixels) {
+void processImageRegions_surface(const cv::Mat& depthImage, cv::Mat gray, int startY, int endY, int half_window_size,
+ double depth_threshold, double gradient_threshold, int intensity_threshold, int window_size, std::vector<cv::Point>& planePixels) {
     for (int y = startY + half_window_size; y < endY - half_window_size; y++) {
-        for (int x = half_window_size * 2; x < depthImage.cols - half_window_size * 2; x++) {
+        for (int x = half_window_size; x < depthImage.cols - half_window_size; x++) {
             uchar minPixel = 255;
             uchar maxPixel = 0;
 
